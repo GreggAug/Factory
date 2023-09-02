@@ -1,5 +1,5 @@
     //%create_dir
-    (function () {
+    function defineFactoryPlugin() {
         var factoryData = {}
         let datapackDialog;
         let resourcepackDialog;
@@ -155,4 +155,6 @@
             }
         }
         )
-    })();
+    };
+
+    defineFactoryPlugin()

@@ -12,7 +12,7 @@
         i += 1
     } while(checkedPath != `/${directory}`)
 }
-    (function () {
+    function defineFactoryPlugin() {
         var factoryData = {}
         let datapackDialog;
         let resourcepackDialog;
@@ -630,4 +630,6 @@ function exportFactoryProject(resourcepackSettings, datapackSettings) {
             }
         }
         )
-    })();
+    };
+
+    defineFactoryPlugin()

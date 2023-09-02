@@ -1,4 +1,4 @@
-(function () {
+function defineFactoryCompilerPlugin () {
     var exec = require('child_process');
     Plugin.register('factory_compiler', {
         name: 'factory_compiler',
@@ -45,4 +45,6 @@
         }
     }
     )
-})();
+};
+
+defineFactoryCompilerPlugin()
