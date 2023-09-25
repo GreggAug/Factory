@@ -63,7 +63,8 @@
                         output: { type: 'folder', label: 'Resource Pack Output', value: this.path, description: 'Select the Resource Pack Folder containing your \"pack.mcmeta\" file' },
                         project_ID: { type: 'text', label: 'Project Namespace', value: null, description: 'What namespace textures and models are generated under (ie: mypack:models/entity/somemodel.json)' },
                         item_json: { type: 'text', label: 'JSON', value: null, description: 'Input what JSON file to store the model as' },
-                        custom_model_data_start: { type: 'number', label: 'Custom Model Data Start', value: 0, min: 0, max: 2147483647, step: 1, description: 'Input what number you want the rig item to start Custom Model Data at (ie: at 100 your model will overwrite custom model data 100, 101, ect)' }
+                        custom_model_data_start: { type: 'number', label: 'Custom Model Data Start', value: 0, min: 0, max: 2147483647, step: 1, description: 'Input what number you want the rig item to start Custom Model Data at (ie: at 100 your model will overwrite custom model data 100, 101, ect)' },
+                        use_hurt_tint: { type: 'checkbox', label: 'Use Hurt Tint texture', value: false, description: 'Toggle to use the second texture as a hurt tint texture' }
                     },
                     onConfirm: function() {
                         if(factoryData[`${Project.uuid}`] == undefined) factoryData[`${Project.uuid}`] = {};
@@ -87,7 +88,7 @@ datapackDialog = new Dialog('datapackDialog', {
         primary_tag: { type: 'input', label: 'Primary Targeting Tag', value: `mypack.${Project.name}`, placeholder: `mypack.${Project.name}`, description: 'Primary tag used to target the mob, use only a single tag' },
         tags: { type: 'input', label: 'Other Tags', placeholder: 'mypack.mobtype_a, mypack.passive', description: 'Other tags that the mob will be given, seperate different tags with a comma (,), do not include primary tag' },
         name: { type: 'input', label: 'Name', value: `${Project.name}`, placeholder: `${Project.name}`, description: 'Translation string for the display entity name' },
-        name_font: { type: 'input', label: 'Name font', value: `minecraft:defualt`, placeholder: 'mypack:myfont', description: 'Font for the display enity name, do not change if you do not know how to use fonts' },
+        name_font: { type: 'input', label: 'Name font', value: `minecraft:default`, placeholder: 'mypack:myfont', description: 'Font for the display enity name, do not change if you do not know how to use fonts' },
         nbt: { type: 'input', label: 'Additional NBT', value: `{transformation:{left_rotation:[0f,0f,0f,1f],right_rotation:[0f,0f,0f,1f],translation:[0f,0f,-.5f],scale:[1f,1f,1f]},width:0.0f,height:0.0f, item_display: "ground"}`, placeholder: `{value:1b}`, description: 'Adidtional NBT, not what is already defined above' },
         functions_path: { type: 'input', label: 'Functions Path', value: `/entity/${Project.name}`, placeholder: 'entity/myMob', description: 'What path the functions for the entity will be created under, from the data/namespace/functions folder' },
         summon_animation: { type: 'input', label: 'Summon Animation', description: 'Summon animation, leave empty for no summon animation. Ran on creation of model' },
@@ -216,11 +217,48 @@ function exportFactoryProject(resourcepackSettings, datapackSettings) {
     create_directory(resourcepackSettings.output, `assets/${resourcepackSettings.project_ID}/models/entity/${entityName}`)
     create_directory(resourcepackSettings.output, `assets/${resourcepackSettings.project_ID}/textures/entity/${entityName}`)
 
+    // Creates the atlas
+    create_directory(resourcepackSettings.output, `assets/minecraft/atlases`)
+    if(!(fs.existsSync(`${resourcepackSettings.output}\\assets\\minecraft\\atlases\\blocks.json`))){
+        fs.writeFileSync(`${resourcepackSettings.output}\\assets\\minecraft\\atlases\\blocks.json`, 
+            `{\n` +
+            `   "sources": [\n` +
+            `      	{\n` +
+            `           "type": "directory",\n` +
+            `           "source": "entity",\n` +
+            `           "prefix": "entity/"\n` +
+            `   }\n`+
+            `   ]\n` +
+            `}`,
+            function (err, result) {
+                if (err) console.log('', err);
+            }
+        )
+    }
+    else{
+        var file = autoParseJSON(fs.readFileSync(`${resourcepackSettings.output}\\assets\\minecraft\\atlases\\blocks.json`, 'utf8'))
+        console.log(file.sources[1])
+        var entity_atlas = {
+            type: 'directory',
+            source: 'entity',
+            prefix: 'entity/'
+        }
+        console.log(entity_atlas == file.sources[1])
+        if(!file.sources.includes(entity_atlas)){
+            file.sources.push(entity_atlas)
+            fs.writeFileSync(`${resourcepackSettings.output}\\assets\\minecraft\\atlases\\blocks.json`, compileJSON(file))
+        }
+    }
+
     let y = 0
     let animCount = 0;
     let overrides = []
     let removeAnimationTags = []
     let summonAnimation = null
+    let animDict = { // Dictionary so the datapack can acess animations via CMD
+
+    }
+
     Project.animations.forEach(ExportAnimation);
     function ExportAnimation(animation, index) {
         if(datapackSettings.summon_animation == animation.name) summonAnimation = animation.name
@@ -239,8 +277,23 @@ function exportFactoryProject(resourcepackSettings, datapackSettings) {
             )
             y += 1
         }
-        let args = [`${resourcepackSettings.current_objmc_path}`, `--objs`].concat(OBJdirs.concat([`--texs`, `${Project.textures[0].path}`, `--autoplay`, `--duration`, `${parseInt(animation.length * 20) + 2}`,  `--colorbehavior`, `time`, `time`, `overlay`, `--out`, `${resourcepackSettings.output}\\assets\\${resourcepackSettings.project_ID}\\models\\entity\\${entityName}\\${animation.name}.json`, `${resourcepackSettings.output}\\assets\\${resourcepackSettings.project_ID}\\textures\\entity\\${entityName}\\${animation.name}.png`]))
+        let args = [`${resourcepackSettings.current_objmc_path}`, `--objs`].concat(OBJdirs.concat([`--texs`, `${Project.textures[0].path}`, `--autoplay`, `--duration`, `${parseInt(animation.length * 20) + 2}`,  `--colorbehavior`, `yaw`, `time`, `time`, `--out`, `${resourcepackSettings.output}\\assets\\${resourcepackSettings.project_ID}\\models\\entity\\${entityName}\\${animation.name}.json`, `${resourcepackSettings.output}\\assets\\${resourcepackSettings.project_ID}\\textures\\entity\\${entityName}\\${animation.name}.png`]))
         exec.execFileSync(`py`, args, { maxBuffer: Infinity });
+        if(resourcepackSettings.use_hurt_tint){
+            args = [`${resourcepackSettings.current_objmc_path}`, `--objs`].concat(OBJdirs.concat([`--texs`, `${Project.textures[1].path}`, `--autoplay`, `--duration`, `${parseInt(animation.length * 20) + 2}`,  `--colorbehavior`, `yaw`, `time`, `time`, `--out`, `${resourcepackSettings.output}\\deleteme.factory_asset`, `${resourcepackSettings.output}\\assets\\${resourcepackSettings.project_ID}\\textures\\entity\\${entityName}\\${animation.name}.hurt.png`]))
+            exec.execFileSync(`py`, args, { maxBuffer: Infinity });
+            let hurtModelJson = {
+                "parent": `${resourcepackSettings.project_ID}:entity/${entityName}/${animation.name}`,
+                "textures": {
+                    "0": `${resourcepackSettings.project_ID}:entity/${entityName}/${animation.name}.hurt`
+                }
+            }
+            fs.writeFileSync(`${resourcepackSettings.output}\\assets\\${resourcepackSettings.project_ID}\\models\\entity\\${entityName}\\${animation.name}.hurt.json`, compileJSON(hurtModelJson),
+                function (err, result) {
+                    if (err) console.log('', err);
+                }
+            )
+        }
 
         let modelJson = fs.readFileSync(`${resourcepackSettings.output}\\assets\\${resourcepackSettings.project_ID}\\models\\entity\\${entityName}\\${animation.name}.json`, 'utf8')
         let parsedModelJson = autoParseJSON(modelJson)
@@ -259,7 +312,14 @@ function exportFactoryProject(resourcepackSettings, datapackSettings) {
             })
         let override = { model: `${resourcepackSettings.project_ID}:entity/${entityName}/${animation.name}`, predicate: { custom_model_data: (resourcepackSettings.custom_model_data_start + animCount) } }
         overrides.push(override)
+        animDict[animation.name] = {"CMD": resourcepackSettings.custom_model_data_start + animCount}
         animCount += 1;
+        if(resourcepackSettings.use_hurt_tint){
+            let override = { model: `${resourcepackSettings.project_ID}:entity/${entityName}/${animation.name}.hurt`, predicate: { custom_model_data: (resourcepackSettings.custom_model_data_start + animCount) } }
+            overrides.push(override)
+            animDict[animation.name]["CMDhurt"] = resourcepackSettings.custom_model_data_start + animCount // Will probably be an unused value but eh
+            animCount += 1;
+        }
     }
     fs.rmdirSync(`${resourcepackSettings.output}\\objstemp`, { recursive: true }) // Deletes the temporary OBJs folder
     let itemJsonFile = fs.readFileSync(`${resourcepackSettings.output}\\assets\\minecraft\\models\\item\\${resourcepackSettings.item_json}.json`, 'utf8')
@@ -298,7 +358,7 @@ function exportFactoryProject(resourcepackSettings, datapackSettings) {
         }
     }
 
-    function parseNBT(input){
+    function parseNBT(input){   // There is a bug involving arrays containing dictionaries not closing, will look into
         // Parses NBT
         // When I was writing this only I and God knew how it works, now only God Knows.
 
@@ -316,17 +376,20 @@ function exportFactoryProject(resourcepackSettings, datapackSettings) {
                         case ',':
                             if(returnValue == undefined) returnValue = read
                             if(returnValue == '') returnValue = undefined
+                            console.log(returnValue, ",")
                             return returnValue
                             
                         case '}':
                             if(returnValue == undefined) returnValue = read
                             if(read == '') returnValue = undefined
+                            console.log(returnValue, "}")
                             return returnValue
             
                         case '{':
                             reader += 1
                             returnValue = parseNBT_recursive(nbtIN)
                             if(returnValue == undefined) returnValue = {}
+                            console.log(returnValue, "{")
                         return returnValue
                         
                         case ':':{
@@ -356,17 +419,21 @@ function exportFactoryProject(resourcepackSettings, datapackSettings) {
                         case '[':{
                             returnValue = []
                             reader += 1
-                            while(nbtIN[reader-1] != `]`){
+                            while(true){
                                 toPush = parseNBT_recursive(nbtIN)
                                 if(toPush != undefined) returnValue.push(toPush)
                                 reader += 1
+                                if(toPush == undefined){
+                                    console.log(returnValue, "[")
+                                    return returnValue
+                                }
                             }
                         }
-                        return returnValue
                         
                         case ']':{
                             if(returnValue == undefined) returnValue = read
                             if(read == '') returnValue = undefined
+                            console.log(returnValue, "]")
                             return returnValue
                             
                         }
@@ -374,6 +441,7 @@ function exportFactoryProject(resourcepackSettings, datapackSettings) {
                     }
                 }
             }
+            console.log(returnValue, "none")
             return returnValue
         }
     
@@ -392,14 +460,16 @@ function exportFactoryProject(resourcepackSettings, datapackSettings) {
         return returnValue
     }
 
-    function createLibFromPath(a){
+    function createLibFromPath(a, endNbt){
         const path = a
         let nbt = {}
         let rootNbt = nbt
         for (p of path) {
-          nbt[p] = {}
-          nbt = nbt[p]
+            if(p == path[path.length-1]) nbt[p] = endNbt
+            else nbt[p] = {}
+            nbt = nbt[p]
         }
+        console.log(rootNbt, endNbt)
         return rootNbt
     }
     
@@ -430,7 +500,18 @@ function exportFactoryProject(resourcepackSettings, datapackSettings) {
     // Summon Command
     displaySlot = datapackSettings.display_slot.split(".")
     let summonNBT = parseNBT(datapackSettings.nbt)
-    summonNBT[displaySlot[0]] = createLibFromPath(displaySlot)[displaySlot[0]]
+
+    const itemNbt = {
+        "id" : `\"minecraft:${resourcepackSettings.item_json}\"`,
+        "Count": "1b",
+        "tag": {
+            "CustomModelData": `${resourcepackSettings.custom_model_data_start}`,
+            "display": {
+                "color": "0"
+            }
+        }
+    }
+    summonNBT[displaySlot[0]] = createLibFromPath(displaySlot, itemNbt)[displaySlot[0]]
     summonNBT["Tags"] = tagsArray
     summonNBT["CustomName"] = `\'{"translate":"${datapackSettings.name}","font":"${datapackSettings.name_font}","italic":false}\'`
     
@@ -481,8 +562,9 @@ function exportFactoryProject(resourcepackSettings, datapackSettings) {
     }
 
     // Tick function
-    create_function(datapackSettings, `factory/tick`, 
-    [`execute as @e[tag=factory.entity] at @s run function ${datapackSettings.project_ID}:factory/tick_filter`])
+    create_function(datapackSettings, `factory/tick`, [
+        `execute as @e[tag=factory.entity] at @s run function ${datapackSettings.project_ID}:factory/tick_filter`
+    ])
 
     // Tick Filter Function
     if(!(fs.existsSync(`${datapackSettings.output}\\data\\${datapackSettings.project_ID}\\functions\\factory\\tick_filter.mcfunction`))){
@@ -498,32 +580,48 @@ function exportFactoryProject(resourcepackSettings, datapackSettings) {
 
     /// Generates Functions
     // Load function
-    create_function(datapackSettings, `factory/load`, 
-    [
+    create_function(datapackSettings, `factory/load`, [
     `scoreboard objectives add factory.frame dummy`,
     `scoreboard objectives add factory.animation dummy`,
     `scoreboard objectives add factory.dummy dummy`,
     `scoreboard objectives add factory.color dummy`,
-    `scoreboard objectives add factory.timer dummy`,
+    `scoreboard objectives add factory.hurt_timer dummy`,
     `scoreboard players set #factory.value.24000 factory.dummy 24000`,
-    `scoreboard players set #factory.value.256 factory.dummy 256`])
+    `scoreboard players set #factory.value.256 factory.dummy 256`
+    ])
 
     // Frame Set Function
-    create_function(datapackSettings, `factory/set_frame`, 
-    [
+    create_function(datapackSettings, `factory/set_frame`, [
     `execute store result score #factory.color_offset factory.dummy run time query gametime`,
     `scoreboard players operation #factory.color_offset factory.dummy %= #factory.value.24000 factory.dummy`,
     `scoreboard players operation #factory.color_offset factory.dummy -= #factory.starting_frame factory.dummy`,
     `scoreboard players operation #factory.color_offset factory.dummy -= #factory.duration factory.dummy`,
-    `scoreboard players operation #factory.color_offset factory.dummy *= #factory.value.256 factory.dummy`,
     `scoreboard players operation @s factory.color = #factory.color_offset factory.dummy`,
     `scoreboard players set #factory.duration factory.dummy 0`,
-    `scoreboard players set #factory.starting_frame factory.dummy 0`])
+    `scoreboard players set #factory.starting_frame factory.dummy 0`
+    ])
+
+    if(resourcepackSettings.use_hurt_tint){
+        // Apply Hurt CMD Function
+        create_function(datapackSettings, `${datapackSettings.functions_path}/apply_hurt`, [
+            `execute store result entity @s ${datapackSettings.display_slot}.tag.CustomModelData int -1 run data get entity @s ${datapackSettings.display_slot}.tag.CustomModelData -1.0000000001`,
+            `tag @s add factory.entity.hurt`,
+            `scoreboard players set @s factory.hurt_timer 10`
+        ])
+    }
+
+    // Un-Apply Hurt CMD Function
+    create_function(datapackSettings, `${datapackSettings.functions_path}/factory_tick/hurt`, [
+    `scoreboard players remove @s factory.hurt_timer 1`,
+    `execute if score @s factory.hurt_timer matches 0 run execute store result entity @s ${datapackSettings.display_slot}.tag.CustomModelData int 1 run data get entity @s ${datapackSettings.display_slot}.tag.CustomModelData 0.9999999999`,
+    `execute if score @s factory.hurt_timer matches 0 run tag @s remove factory.entity.hurt`
+    ])
 
     // Start Animation Functions
     function generateStartAnimationFuncts (animation, index){
         create_function(datapackSettings, `${datapackSettings.functions_path}/${animation.name}.start`, (removeAnimationTags.concat([
-        `data modify entity @s ${datapackSettings.display_slot}.tag.CustomModelData set value ${resourcepackSettings.custom_model_data_start + index}`,
+        `data modify entity @s ${datapackSettings.display_slot}.tag.CustomModelData set value ${animDict[animation.name]["CMD"]}`,
+        `execute if entity @s[tag=factory.entity.hurt] run data modify entity @s ${datapackSettings.display_slot}.tag.CustomModelData set value ${animDict[animation.name]["CMDhurt"]}`,
         `scoreboard players set #factory.starting_frame factory.dummy 0`,
         `scoreboard players set #factory.duration factory.dummy ${parseInt(animation.length * 20) - 1}`,
         `function ${datapackSettings.project_ID}:factory/set_frame`,
@@ -536,7 +634,7 @@ function exportFactoryProject(resourcepackSettings, datapackSettings) {
 
     // Animation Tick Functions Generator
     toWrite_entity_tick = [
-        `execute store result storage pdd:storage temp.entity.frame int 1 run scoreboard players get @s factory.frame`
+        `execute store result storage factory:storage temp.entity.frame int 1 run scoreboard players get @s factory.frame`
     ]
     if (Project.animations.length != 0){
         Project.animations.forEach(element => {
@@ -571,6 +669,9 @@ function exportFactoryProject(resourcepackSettings, datapackSettings) {
             // Animation Tick Function
             create_function(datapackSettings, `${datapackSettings.functions_path}/factory_tick/${element.name}`, toWrite_entity_animation_tick)
         });
+        if(resourcepackSettings.use_hurt_tint){
+            toWrite_entity_tick.push(`execute if entity @s[tag=factory.entity.hurt] run function ${datapackSettings.project_ID}:${datapackSettings.functions_path}/factory_tick/hurt`)
+        }
         toWrite_entity_tick.push(`function ${datapackSettings.project_ID}:${datapackSettings.functions_path}/tick`)
         toWrite_entity_tick.push(`scoreboard players add @s factory.frame 1`)
     }
@@ -583,11 +684,13 @@ function exportFactoryProject(resourcepackSettings, datapackSettings) {
     if(summonAnimation != null){
         create_function(datapackSettings, `${datapackSettings.functions_path}/summon`, [
             `summon ${datapackSettings.entity_type} ~ ~ ~ ${compileNBT(summonNBT)}`,
-            `execute as @e[tag=factory.${datapackSettings.primary_tag}.unprocessed,limit=1,sort=nearest] run function ${datapackSettings.project_ID}:${datapackSettings.functions_path}/${summonAnimation}.start`])
+            `execute as @e[tag=factory.${datapackSettings.primary_tag}.unprocessed,limit=1,sort=nearest] run function ${datapackSettings.project_ID}:${datapackSettings.functions_path}/${summonAnimation}.start`
+        ])
     }
     else{
         create_function(datapackSettings, `${datapackSettings.functions_path}/summon`, [
-            `summon ${datapackSettings.entity_type} ~ ~ ~ ${compileNBT(summonNBT)}`])
+            `summon ${datapackSettings.entity_type} ~ ~ ~ ${compileNBT(summonNBT)}`
+        ])
     }
     }
 };

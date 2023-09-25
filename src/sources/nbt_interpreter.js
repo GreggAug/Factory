@@ -5,7 +5,7 @@
         }
     }
 
-    function parseNBT(input){
+    function parseNBT(input){   // There is a bug involving arrays containing dictionaries not closing, will look into
         // Parses NBT
         // When I was writing this only I and God knew how it works, now only God Knows.
 
@@ -23,17 +23,20 @@
                         case ',':
                             if(returnValue == undefined) returnValue = read
                             if(returnValue == '') returnValue = undefined
+                            console.log(returnValue, ",")
                             return returnValue
                             
                         case '}':
                             if(returnValue == undefined) returnValue = read
                             if(read == '') returnValue = undefined
+                            console.log(returnValue, "}")
                             return returnValue
             
                         case '{':
                             reader += 1
                             returnValue = parseNBT_recursive(nbtIN)
                             if(returnValue == undefined) returnValue = {}
+                            console.log(returnValue, "{")
                         return returnValue
                         
                         case ':':{
@@ -63,17 +66,21 @@
                         case '[':{
                             returnValue = []
                             reader += 1
-                            while(nbtIN[reader-1] != `]`){
+                            while(true){
                                 toPush = parseNBT_recursive(nbtIN)
                                 if(toPush != undefined) returnValue.push(toPush)
                                 reader += 1
+                                if(toPush == undefined){
+                                    console.log(returnValue, "[")
+                                    return returnValue
+                                }
                             }
                         }
-                        return returnValue
                         
                         case ']':{
                             if(returnValue == undefined) returnValue = read
                             if(read == '') returnValue = undefined
+                            console.log(returnValue, "]")
                             return returnValue
                             
                         }
@@ -81,6 +88,7 @@
                     }
                 }
             }
+            console.log(returnValue, "none")
             return returnValue
         }
     
@@ -99,13 +107,15 @@
         return returnValue
     }
 
-    function createLibFromPath(a){
+    function createLibFromPath(a, endNbt){
         const path = a
         let nbt = {}
         let rootNbt = nbt
         for (p of path) {
-          nbt[p] = {}
-          nbt = nbt[p]
+            if(p == path[path.length-1]) nbt[p] = endNbt
+            else nbt[p] = {}
+            nbt = nbt[p]
         }
+        console.log(rootNbt, endNbt)
         return rootNbt
     }

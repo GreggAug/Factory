@@ -38,11 +38,48 @@ function exportFactoryProject(resourcepackSettings, datapackSettings) {
     create_directory(resourcepackSettings.output, `assets/${resourcepackSettings.project_ID}/models/entity/${entityName}`)
     create_directory(resourcepackSettings.output, `assets/${resourcepackSettings.project_ID}/textures/entity/${entityName}`)
 
+    // Creates the atlas
+    create_directory(resourcepackSettings.output, `assets/minecraft/atlases`)
+    if(!(fs.existsSync(`${resourcepackSettings.output}\\assets\\minecraft\\atlases\\blocks.json`))){
+        fs.writeFileSync(`${resourcepackSettings.output}\\assets\\minecraft\\atlases\\blocks.json`, 
+            `{\n` +
+            `   "sources": [\n` +
+            `      	{\n` +
+            `           "type": "directory",\n` +
+            `           "source": "entity",\n` +
+            `           "prefix": "entity/"\n` +
+            `   }\n`+
+            `   ]\n` +
+            `}`,
+            function (err, result) {
+                if (err) console.log('', err);
+            }
+        )
+    }
+    else{
+        var file = autoParseJSON(fs.readFileSync(`${resourcepackSettings.output}\\assets\\minecraft\\atlases\\blocks.json`, 'utf8'))
+        console.log(file.sources[1])
+        var entity_atlas = {
+            type: 'directory',
+            source: 'entity',
+            prefix: 'entity/'
+        }
+        console.log(entity_atlas == file.sources[1])
+        if(!file.sources.includes(entity_atlas)){
+            file.sources.push(entity_atlas)
+            fs.writeFileSync(`${resourcepackSettings.output}\\assets\\minecraft\\atlases\\blocks.json`, compileJSON(file))
+        }
+    }
+
     let y = 0
     let animCount = 0;
     let overrides = []
     let removeAnimationTags = []
     let summonAnimation = null
+    let animDict = { // Dictionary so the datapack can acess animations via CMD
+
+    }
+
     Project.animations.forEach(ExportAnimation);
     function ExportAnimation(animation, index) {
         if(datapackSettings.summon_animation == animation.name) summonAnimation = animation.name
@@ -61,8 +98,23 @@ function exportFactoryProject(resourcepackSettings, datapackSettings) {
             )
             y += 1
         }
-        let args = [`${resourcepackSettings.current_objmc_path}`, `--objs`].concat(OBJdirs.concat([`--texs`, `${Project.textures[0].path}`, `--autoplay`, `--duration`, `${parseInt(animation.length * 20) + 2}`,  `--colorbehavior`, `time`, `time`, `overlay`, `--out`, `${resourcepackSettings.output}\\assets\\${resourcepackSettings.project_ID}\\models\\entity\\${entityName}\\${animation.name}.json`, `${resourcepackSettings.output}\\assets\\${resourcepackSettings.project_ID}\\textures\\entity\\${entityName}\\${animation.name}.png`]))
+        let args = [`${resourcepackSettings.current_objmc_path}`, `--objs`].concat(OBJdirs.concat([`--texs`, `${Project.textures[0].path}`, `--autoplay`, `--duration`, `${parseInt(animation.length * 20) + 2}`,  `--colorbehavior`, `yaw`, `time`, `time`, `--out`, `${resourcepackSettings.output}\\assets\\${resourcepackSettings.project_ID}\\models\\entity\\${entityName}\\${animation.name}.json`, `${resourcepackSettings.output}\\assets\\${resourcepackSettings.project_ID}\\textures\\entity\\${entityName}\\${animation.name}.png`]))
         exec.execFileSync(`py`, args, { maxBuffer: Infinity });
+        if(resourcepackSettings.use_hurt_tint){
+            args = [`${resourcepackSettings.current_objmc_path}`, `--objs`].concat(OBJdirs.concat([`--texs`, `${Project.textures[1].path}`, `--autoplay`, `--duration`, `${parseInt(animation.length * 20) + 2}`,  `--colorbehavior`, `yaw`, `time`, `time`, `--out`, `${resourcepackSettings.output}\\deleteme.factory_asset`, `${resourcepackSettings.output}\\assets\\${resourcepackSettings.project_ID}\\textures\\entity\\${entityName}\\${animation.name}.hurt.png`]))
+            exec.execFileSync(`py`, args, { maxBuffer: Infinity });
+            let hurtModelJson = {
+                "parent": `${resourcepackSettings.project_ID}:entity/${entityName}/${animation.name}`,
+                "textures": {
+                    "0": `${resourcepackSettings.project_ID}:entity/${entityName}/${animation.name}.hurt`
+                }
+            }
+            fs.writeFileSync(`${resourcepackSettings.output}\\assets\\${resourcepackSettings.project_ID}\\models\\entity\\${entityName}\\${animation.name}.hurt.json`, compileJSON(hurtModelJson),
+                function (err, result) {
+                    if (err) console.log('', err);
+                }
+            )
+        }
 
         let modelJson = fs.readFileSync(`${resourcepackSettings.output}\\assets\\${resourcepackSettings.project_ID}\\models\\entity\\${entityName}\\${animation.name}.json`, 'utf8')
         let parsedModelJson = autoParseJSON(modelJson)
@@ -81,7 +133,14 @@ function exportFactoryProject(resourcepackSettings, datapackSettings) {
             })
         let override = { model: `${resourcepackSettings.project_ID}:entity/${entityName}/${animation.name}`, predicate: { custom_model_data: (resourcepackSettings.custom_model_data_start + animCount) } }
         overrides.push(override)
+        animDict[animation.name] = {"CMD": resourcepackSettings.custom_model_data_start + animCount}
         animCount += 1;
+        if(resourcepackSettings.use_hurt_tint){
+            let override = { model: `${resourcepackSettings.project_ID}:entity/${entityName}/${animation.name}.hurt`, predicate: { custom_model_data: (resourcepackSettings.custom_model_data_start + animCount) } }
+            overrides.push(override)
+            animDict[animation.name]["CMDhurt"] = resourcepackSettings.custom_model_data_start + animCount // Will probably be an unused value but eh
+            animCount += 1;
+        }
     }
     fs.rmdirSync(`${resourcepackSettings.output}\\objstemp`, { recursive: true }) // Deletes the temporary OBJs folder
     let itemJsonFile = fs.readFileSync(`${resourcepackSettings.output}\\assets\\minecraft\\models\\item\\${resourcepackSettings.item_json}.json`, 'utf8')

@@ -27,7 +27,18 @@
     // Summon Command
     displaySlot = datapackSettings.display_slot.split(".")
     let summonNBT = parseNBT(datapackSettings.nbt)
-    summonNBT[displaySlot[0]] = createLibFromPath(displaySlot)[displaySlot[0]]
+
+    const itemNbt = {
+        "id" : `\"minecraft:${resourcepackSettings.item_json}\"`,
+        "Count": "1b",
+        "tag": {
+            "CustomModelData": `${resourcepackSettings.custom_model_data_start}`,
+            "display": {
+                "color": "0"
+            }
+        }
+    }
+    summonNBT[displaySlot[0]] = createLibFromPath(displaySlot, itemNbt)[displaySlot[0]]
     summonNBT["Tags"] = tagsArray
     summonNBT["CustomName"] = `\'{"translate":"${datapackSettings.name}","font":"${datapackSettings.name_font}","italic":false}\'`
     
@@ -78,8 +89,9 @@
     }
 
     // Tick function
-    create_function(datapackSettings, `factory/tick`, 
-    [`execute as @e[tag=factory.entity] at @s run function ${datapackSettings.project_ID}:factory/tick_filter`])
+    create_function(datapackSettings, `factory/tick`, [
+        `execute as @e[tag=factory.entity] at @s run function ${datapackSettings.project_ID}:factory/tick_filter`
+    ])
 
     // Tick Filter Function
     if(!(fs.existsSync(`${datapackSettings.output}\\data\\${datapackSettings.project_ID}\\functions\\factory\\tick_filter.mcfunction`))){
@@ -95,32 +107,48 @@
 
     /// Generates Functions
     // Load function
-    create_function(datapackSettings, `factory/load`, 
-    [
+    create_function(datapackSettings, `factory/load`, [
     `scoreboard objectives add factory.frame dummy`,
     `scoreboard objectives add factory.animation dummy`,
     `scoreboard objectives add factory.dummy dummy`,
     `scoreboard objectives add factory.color dummy`,
-    `scoreboard objectives add factory.timer dummy`,
+    `scoreboard objectives add factory.hurt_timer dummy`,
     `scoreboard players set #factory.value.24000 factory.dummy 24000`,
-    `scoreboard players set #factory.value.256 factory.dummy 256`])
+    `scoreboard players set #factory.value.256 factory.dummy 256`
+    ])
 
     // Frame Set Function
-    create_function(datapackSettings, `factory/set_frame`, 
-    [
+    create_function(datapackSettings, `factory/set_frame`, [
     `execute store result score #factory.color_offset factory.dummy run time query gametime`,
     `scoreboard players operation #factory.color_offset factory.dummy %= #factory.value.24000 factory.dummy`,
     `scoreboard players operation #factory.color_offset factory.dummy -= #factory.starting_frame factory.dummy`,
     `scoreboard players operation #factory.color_offset factory.dummy -= #factory.duration factory.dummy`,
-    `scoreboard players operation #factory.color_offset factory.dummy *= #factory.value.256 factory.dummy`,
     `scoreboard players operation @s factory.color = #factory.color_offset factory.dummy`,
     `scoreboard players set #factory.duration factory.dummy 0`,
-    `scoreboard players set #factory.starting_frame factory.dummy 0`])
+    `scoreboard players set #factory.starting_frame factory.dummy 0`
+    ])
+
+    if(resourcepackSettings.use_hurt_tint){
+        // Apply Hurt CMD Function
+        create_function(datapackSettings, `${datapackSettings.functions_path}/apply_hurt`, [
+            `execute store result entity @s ${datapackSettings.display_slot}.tag.CustomModelData int -1 run data get entity @s ${datapackSettings.display_slot}.tag.CustomModelData -1.0000000001`,
+            `tag @s add factory.entity.hurt`,
+            `scoreboard players set @s factory.hurt_timer 10`
+        ])
+    }
+
+    // Un-Apply Hurt CMD Function
+    create_function(datapackSettings, `${datapackSettings.functions_path}/factory_tick/hurt`, [
+    `scoreboard players remove @s factory.hurt_timer 1`,
+    `execute if score @s factory.hurt_timer matches 0 run execute store result entity @s ${datapackSettings.display_slot}.tag.CustomModelData int 1 run data get entity @s ${datapackSettings.display_slot}.tag.CustomModelData 0.9999999999`,
+    `execute if score @s factory.hurt_timer matches 0 run tag @s remove factory.entity.hurt`
+    ])
 
     // Start Animation Functions
     function generateStartAnimationFuncts (animation, index){
         create_function(datapackSettings, `${datapackSettings.functions_path}/${animation.name}.start`, (removeAnimationTags.concat([
-        `data modify entity @s ${datapackSettings.display_slot}.tag.CustomModelData set value ${resourcepackSettings.custom_model_data_start + index}`,
+        `data modify entity @s ${datapackSettings.display_slot}.tag.CustomModelData set value ${animDict[animation.name]["CMD"]}`,
+        `execute if entity @s[tag=factory.entity.hurt] run data modify entity @s ${datapackSettings.display_slot}.tag.CustomModelData set value ${animDict[animation.name]["CMDhurt"]}`,
         `scoreboard players set #factory.starting_frame factory.dummy 0`,
         `scoreboard players set #factory.duration factory.dummy ${parseInt(animation.length * 20) - 1}`,
         `function ${datapackSettings.project_ID}:factory/set_frame`,
@@ -133,7 +161,7 @@
 
     // Animation Tick Functions Generator
     toWrite_entity_tick = [
-        `execute store result storage pdd:storage temp.entity.frame int 1 run scoreboard players get @s factory.frame`
+        `execute store result storage factory:storage temp.entity.frame int 1 run scoreboard players get @s factory.frame`
     ]
     if (Project.animations.length != 0){
         Project.animations.forEach(element => {
@@ -168,6 +196,9 @@
             // Animation Tick Function
             create_function(datapackSettings, `${datapackSettings.functions_path}/factory_tick/${element.name}`, toWrite_entity_animation_tick)
         });
+        if(resourcepackSettings.use_hurt_tint){
+            toWrite_entity_tick.push(`execute if entity @s[tag=factory.entity.hurt] run function ${datapackSettings.project_ID}:${datapackSettings.functions_path}/factory_tick/hurt`)
+        }
         toWrite_entity_tick.push(`function ${datapackSettings.project_ID}:${datapackSettings.functions_path}/tick`)
         toWrite_entity_tick.push(`scoreboard players add @s factory.frame 1`)
     }
@@ -180,9 +211,11 @@
     if(summonAnimation != null){
         create_function(datapackSettings, `${datapackSettings.functions_path}/summon`, [
             `summon ${datapackSettings.entity_type} ~ ~ ~ ${compileNBT(summonNBT)}`,
-            `execute as @e[tag=factory.${datapackSettings.primary_tag}.unprocessed,limit=1,sort=nearest] run function ${datapackSettings.project_ID}:${datapackSettings.functions_path}/${summonAnimation}.start`])
+            `execute as @e[tag=factory.${datapackSettings.primary_tag}.unprocessed,limit=1,sort=nearest] run function ${datapackSettings.project_ID}:${datapackSettings.functions_path}/${summonAnimation}.start`
+        ])
     }
     else{
         create_function(datapackSettings, `${datapackSettings.functions_path}/summon`, [
-            `summon ${datapackSettings.entity_type} ~ ~ ~ ${compileNBT(summonNBT)}`])
+            `summon ${datapackSettings.entity_type} ~ ~ ~ ${compileNBT(summonNBT)}`
+        ])
     }
