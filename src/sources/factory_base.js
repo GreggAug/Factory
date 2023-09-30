@@ -137,9 +137,10 @@
                     name: 'Export',
                     description: 'Export Factory Project as a datapack and Resourcepack',
                     icon: 'fa-file-export',
-                    click: function () {
+                    click: function actionExportFactoryProjectOnClick()
+                    {
                         exportFactoryProject(factoryData[`${Project.uuid}`]["resourcepack"], factoryData[`${Project.uuid}`]["datapack"])
-                    }
+                    } 
                 })
 
             },

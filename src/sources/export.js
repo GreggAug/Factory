@@ -126,6 +126,11 @@ function exportFactoryProject(resourcepackSettings, datapackSettings) {
 			"translation": [0, -16.91, -1],
 			"scale": [1, 1, 1]
         }
+        parsedModelJson.display.head = {
+            "rotation": [85, 0, 0],
+			"translation": [0, 0, 0],
+			"scale": [1, 1, 1]
+        }
         modelJson = compileJSON(parsedModelJson)
         fs.writeFileSync(`${resourcepackSettings.output}\\assets\\${resourcepackSettings.project_ID}\\models\\entity\\${entityName}\\${animation.name}.json`, modelJson,
             function (err, result) {

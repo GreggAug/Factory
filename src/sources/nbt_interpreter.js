@@ -1,121 +1,175 @@
-    function isValidNBTChar(input){
-        const specialChars = [',','[',']','{','}',':','"','\'','`'," "]
-        if (specialChars.indexOf(input) == -1){
-            return true
+function removeWhiteSpace(input) { // Removes spaces in string input, aside from spaces included in quotes or encased in apostrophese
+  let returnString = "";
+  let inQuotes = false;
+  let inApostrophe = false;
+  for (let i = 0; i < input.length; i++) {
+    if (isValidNBTChar(input[i]) || inQuotes || inApostrophe) {
+      returnString += input[i];
+      if (inQuotes && input[i] == '"') {
+        if (input[i - 1] != "\\") {
+          inQuotes = false;
         }
-    }
-
-    function parseNBT(input){   // There is a bug involving arrays containing dictionaries not closing, will look into
-        // Parses NBT
-        // When I was writing this only I and God knew how it works, now only God Knows.
-
-        let reader = 0
-        function parseNBT_recursive(inputRecursive){
-            let nbtIN = inputRecursive
-            let returnValue
-            let read = ''
-            for(; reader < nbtIN.length; reader++){
-                if(isValidNBTChar(nbtIN[reader])) {
-                    read += nbtIN[reader]
-                }
-                else{
-                    switch(nbtIN[reader]){
-                        case ',':
-                            if(returnValue == undefined) returnValue = read
-                            if(returnValue == '') returnValue = undefined
-                            console.log(returnValue, ",")
-                            return returnValue
-                            
-                        case '}':
-                            if(returnValue == undefined) returnValue = read
-                            if(read == '') returnValue = undefined
-                            console.log(returnValue, "}")
-                            return returnValue
-            
-                        case '{':
-                            reader += 1
-                            returnValue = parseNBT_recursive(nbtIN)
-                            if(returnValue == undefined) returnValue = {}
-                            console.log(returnValue, "{")
-                        return returnValue
-                        
-                        case ':':{
-                            reader += 1
-                            if(returnValue == undefined) returnValue = {}
-                            returnValue[read] = parseNBT_recursive(nbtIN)
-                            read = ""
-                            break
-                        }
-                        
-                        case '"':{
-                            for(;nbtIN[reader] != "\""; reader++){
-                                read += nbtIN[reader]
-                            }
-                            read += '\"'
-                            break
-                        }
-                        
-                        case '\'':{
-                            for(;nbtIN[reader] != '\''; reader++){
-                                read += nbtIN[reader]
-                            }
-                            read += '\''
-                            break
-                        }
-                        
-                        case '[':{
-                            returnValue = []
-                            reader += 1
-                            while(true){
-                                toPush = parseNBT_recursive(nbtIN)
-                                if(toPush != undefined) returnValue.push(toPush)
-                                reader += 1
-                                if(toPush == undefined){
-                                    console.log(returnValue, "[")
-                                    return returnValue
-                                }
-                            }
-                        }
-                        
-                        case ']':{
-                            if(returnValue == undefined) returnValue = read
-                            if(read == '') returnValue = undefined
-                            console.log(returnValue, "]")
-                            return returnValue
-                            
-                        }
-                            
-                    }
-                }
-            }
-            console.log(returnValue, "none")
-            return returnValue
+      } else if (inApostrophe && input[i] == "'") {
+        if (input[i - 1] != "\\") {
+          inApostrophe = false;
         }
-    
-        let toParse = input
-        return parseNBT_recursive(toParse) 
-    }
-
-    // Compiles a dictionary into a NBT String, I actually know how this one works
-    function compileNBT(input){
-        returnValue = compileJSON(input)
-        returnValue = returnValue.replaceAll('\n', "")
-        returnValue = returnValue.replaceAll('\t', "")
-        returnValue = returnValue.replaceAll('\\\"', "つREALMANSSTRING,つNOTTHATSTUPIDJSONAUTOGENERATEDONEつ") // Praying nobody has this string in their nbt,
-        returnValue = returnValue.replaceAll('\"', "")                                                        // threw in some つs to make sure
-        returnValue = returnValue.replaceAll('つREALMANSSTRING,つNOTTHATSTUPIDJSONAUTOGENERATEDONEつ', "\"")         
-        return returnValue
-    }
-
-    function createLibFromPath(a, endNbt){
-        const path = a
-        let nbt = {}
-        let rootNbt = nbt
-        for (p of path) {
-            if(p == path[path.length-1]) nbt[p] = endNbt
-            else nbt[p] = {}
-            nbt = nbt[p]
+      }
+    } else {
+      switch (input[i]) {
+        case " ": {
+          break;
         }
-        console.log(rootNbt, endNbt)
-        return rootNbt
+        case '"': {
+          inQuotes = true;
+          returnString += '"';
+          break;
+        }
+        case "'": {
+          inApostrophe = true;
+          returnString += "'";
+          break;
+        }
+        default: {
+          returnString += input[i];
+          break;
+        }
+      }
     }
+  }
+  return returnString;
+}
+
+function isValidNBTChar(charIn) {
+  const specialChars = [",", "[", "]", "{", "}", ":", '"', "'", " "];
+  if (specialChars.indexOf(charIn) == -1) {
+    return true;
+  }
+}
+
+
+// Probably the longest NBT parser I've written but also the most legible one and most functional one
+function parseNBT(input) { // Main function for NBT parsing
+  const NBT = removeWhiteSpace(input)
+  let reader = 0;
+
+  function parseString() { // Parses String values in key-value pairs and key names
+    let stringSet = false;
+    let returnString = "";
+    let inQuotes = false;
+    let inApostrophe = false;
+    while (!stringSet) {
+      if (isValidNBTChar(NBT[reader]) || inQuotes || inApostrophe) {
+        returnString += NBT[reader];
+        if (inQuotes && NBT[reader] == '"') {
+          if (NBT[reader - 1] != "\\") {
+            inQuotes = false;
+          }
+        } else if (inApostrophe && NBT[reader] == "'") {
+          if (NBT[reader - 1] != "\\") {
+            inApostrophe = false;
+          }
+        }
+      } else {
+        switch (NBT[reader]) {
+          case '"': {
+            inQuotes = true;
+            returnString += '"';
+            break;
+          }
+          case "'": {
+            inApostrophe = true;
+            returnString += "'";
+            break;
+          }
+          default: {
+            stringSet = true;
+            break;
+          }
+        }
+      }
+      if (!stringSet) reader += 1;
+    }
+    return returnString;
+  }
+
+  function parseArray() { // Parses Array values in Key-Value pairs
+    let returnArray = [];
+    reader += 1;
+    while (NBT[reader] != "]") {
+      let currentValue = parseValue();
+      returnArray.push(currentValue);
+      if (NBT[reader] == ",") reader++;
+    }
+    reader++;
+    return returnArray;
+  }
+
+  function parseDict() { // Parses dictionary values in key-value pairs & first parser for the NBT input
+    let returnDict = {};
+    if (NBT[reader] == "{") {
+      reader++;
+      while (NBT[reader] != "}") {
+        let currentKey = parseString(); // Gets the Current Key using the String Parser
+        reader++;
+        let currentValue = parseValue(); // Gets the currennt value using the value parse
+        if (NBT[reader] == ",") reader++;
+        returnDict[currentKey] = currentValue;
+      }
+    }
+    reader++;
+    return returnDict;
+  }
+
+  function parseValue() { // Parses all Values in key-value pairs
+    let currentValue = undefined;
+    while (currentValue == undefined) {
+      switch (NBT[reader]) {
+        case "{": {
+          currentValue = parseDict();
+          break;
+        }
+        case "[": {
+          currentValue = parseArray();
+          break;
+        }
+        default: {
+          currentValue = parseString();
+          break;
+        }
+      }
+    }
+    return currentValue;
+  }
+
+  return parseDict();
+}
+
+// Compiles a dictionary into a NBT String, I actually know how this one works
+function compileNBT(input) {
+  returnValue = compileJSON(input);
+  returnValue = returnValue.replaceAll("\n", "");
+  returnValue = returnValue.replaceAll("\t", "");
+  returnValue = returnValue.replaceAll(
+    '\\"',
+    "つREALMANSSTRING,つNOTTHATSTUPIDJSONAUTOGENERATEDONEつ"
+  ); // Praying nobody has this string in their nbt,
+  returnValue = returnValue.replaceAll('"', ""); // threw in some つs to make sure
+  returnValue = returnValue.replaceAll(
+    "つREALMANSSTRING,つNOTTHATSTUPIDJSONAUTOGENERATEDONEつ",
+    '"'
+  );
+  return returnValue;
+}
+
+function createLibFromPath(a, endNbt) {
+  const path = a;
+  let nbt = {};
+  let rootNbt = nbt;
+  for (p of path) {
+    if (p == path[path.length - 1]) nbt[p] = endNbt;
+    else nbt[p] = {};
+    nbt = nbt[p];
+  }
+  console.log(rootNbt, endNbt);
+  return rootNbt;
+}
