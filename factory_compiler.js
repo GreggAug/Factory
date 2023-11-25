@@ -13,6 +13,7 @@ function defineFactoryCompilerPlugin () {
         },
         onload() {
             const fs = require("fs");
+            console.log(this.path)
             const localPath = this.path.replace("factory_compiler.js", "")
             let kk_base = fs.readFileSync(`${localPath}main.js`, { encoding: "utf8" }, 'r')
             let fileInsert = ""

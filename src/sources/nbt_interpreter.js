@@ -1,4 +1,5 @@
-function removeWhiteSpace(input) { // Removes spaces in string input, aside from spaces included in quotes or encased in apostrophese
+function removeWhiteSpace(input) {
+  // Removes spaces in string input, aside from spaces included in quotes or encased in apostrophese
   let returnString = "";
   let inQuotes = false;
   let inApostrophe = false;
@@ -46,13 +47,14 @@ function isValidNBTChar(charIn) {
   }
 }
 
-
 // Probably the longest NBT parser I've written but also the most legible one and most functional one
-function parseNBT(input) { // Main function for NBT parsing
-  const NBT = removeWhiteSpace(input)
+function parseNBT(input) {
+  // Main function for NBT parsing
+  const NBT = removeWhiteSpace(input);
   let reader = 0;
 
-  function parseString() { // Parses String values in key-value pairs and key names
+  function parseString() {
+    // Parses String values in key-value pairs and key names
     let stringSet = false;
     let returnString = "";
     let inQuotes = false;
@@ -92,7 +94,8 @@ function parseNBT(input) { // Main function for NBT parsing
     return returnString;
   }
 
-  function parseArray() { // Parses Array values in Key-Value pairs
+  function parseArray() {
+    // Parses Array values in Key-Value pairs
     let returnArray = [];
     reader += 1;
     while (NBT[reader] != "]") {
@@ -104,7 +107,8 @@ function parseNBT(input) { // Main function for NBT parsing
     return returnArray;
   }
 
-  function parseDict() { // Parses dictionary values in key-value pairs & first parser for the NBT input
+  function parseDict() {
+    // Parses dictionary values in key-value pairs & first parser for the NBT input
     let returnDict = {};
     if (NBT[reader] == "{") {
       reader++;
@@ -120,7 +124,8 @@ function parseNBT(input) { // Main function for NBT parsing
     return returnDict;
   }
 
-  function parseValue() { // Parses all Values in key-value pairs
+  function parseValue() {
+    // Parses all Values in key-value pairs
     let currentValue = undefined;
     while (currentValue == undefined) {
       switch (NBT[reader]) {
@@ -161,15 +166,17 @@ function compileNBT(input) {
   return returnValue;
 }
 
-function createLibFromPath(a, endNbt) {
-  const path = a;
-  let nbt = {};
-  let rootNbt = nbt;
-  for (p of path) {
-    if (p == path[path.length - 1]) nbt[p] = endNbt;
-    else nbt[p] = {};
-    nbt = nbt[p];
+function AcessObjectFromString(o, s, value) { // took this from https://stackoverflow.com/questions/6491463/accessing-nested-javascript-objects-and-arrays-by-string-path
+  s = s.replace(/\[(\w+)\]/g, '.$1'); // convert indexes to properties
+  s = s.replace(/^\./, '');           // strip a leading dot
+  var a = s.split('.');
+  for (var i = 0, n = a.length; i < n; ++i) {
+      var k = a[i];
+      if (k in o) {
+          o = o[k];
+      } else {
+          return;
+      }
   }
-  console.log(rootNbt, endNbt);
-  return rootNbt;
+  o = value;
 }
