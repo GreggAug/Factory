@@ -1,4 +1,5 @@
 //%create_dir
+
 function defineFactoryPlugin() {
   var factoryData = {};
   let datapackDialog;
@@ -12,6 +13,7 @@ function defineFactoryPlugin() {
     [
       "actionResourcepackDialog",
       "actionDatapackDialog",
+      "actionTiedFunctionsDialog",
       "actionExportFactoryProject",
     ],
     { condition: () => Format.id == "factory_project" }
@@ -56,6 +58,7 @@ function defineFactoryPlugin() {
 
       //%resourcepackDialog
       //%datapackDialog
+      //%TiedFunctionsDialog
       //%debug
 
       // Saves Entity Settings and Project Settings
@@ -144,14 +147,31 @@ function defineFactoryPlugin() {
             datapackDialog.show();
           },
         }));
+        (actionTiedFunctionsDialog = new Action("actionTiedFunctionsDialog", {
+          condition: () => Format.id == "factory_project",
+          name: "Tied Functions",
+          description: "Set Tied Functions",
+          icon: "settings",
+          click: function () {
+            if (factoryData[`${Project.uuid}`] != undefined)
+              if (factoryData[`${Project.uuid}`]["tiedFunctions"] != undefined) {
+                tiedFunctionsDialog.setFormValues(
+                  factoryData[`${Project.uuid}`]["tiedFunctions"]
+                );
+              }
+              tiedFunctionsDialog.show();
+          },
+        }));
 
       //%export
 
+      // Commenting out the keyframes for adding functions
+      /*
       BoneAnimator.addChannel("factory.commands", {
         condition: () => Format.id == "factory_project",
         name: "Functions",
         mutable: false,
-        max_data_points: 1000,
+        max_data_points: 1000
       });
 
       new Property(KeyframeDataPoint, "string", "factory.commands", {
@@ -160,7 +180,30 @@ function defineFactoryPlugin() {
           return point.keyframe.channel === "factory.commands";
         },
         exposed: true,
+        default: '',
+        factoryCommand: true
       });
+
+      
+      new BarSelect('function_interpolation', {
+        category: 'animation',
+        condition: () => Animator.open && Timeline.selected.length && Timeline.selected[0]["channel"] == 'factory.commands',
+        options: {
+          step: true,
+          span: true
+        },
+        onChange: function(sel, event) {
+          Undo.initEdit({keyframes: Timeline.selected})
+          Timeline.selected.forEach((kf) => {
+            if (kf.transform) {
+              kf.interpolation = sel.value;
+            }
+          })
+          Undo.finishEdit('Change keyframes interpolation')
+          updateKeyframeSelection();
+        }
+      })
+      */
 
       actionExportFactoryProject = new Action("actionExportFactoryProject", {
         condition: () => Format.id == "factory_project",

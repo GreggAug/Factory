@@ -196,9 +196,9 @@ function generateStartAnimationFuncts(animation, index) {
       `execute if entity @s[tag=factory.entity.hurt] run data modify entity @s ${
         datapackSettings.display_slot
       }.tag.CustomModelData set value ${animDict[animation.name]["CMDhurt"]}`,
-      `scoreboard players set #factory.starting_frame factory.dummy 0`,
+      `scoreboard players set #factory.starting_frame factory.dummy -3`, // Starting the animation at -3 frames behind makes it actually start on the first frame, don't know why
       `scoreboard players set #factory.duration factory.dummy ${
-        parseInt(animation.length * 20) - 1
+        parseInt(animation.length * 20)
       }`,
       `function ${datapackSettings.project_ID}:factory/set_frame`,
       `execute store result entity @s ${datapackSettings.display_slot}.tag.display.color int 1 run scoreboard players get #factory.color_offset factory.dummy`,
@@ -275,7 +275,7 @@ if (Project.animations.length != 0) {
       let toWrite = []
       for(bone in functions[`${frame}`]){
         create_function(datapackSettings, `${datapackSettings.functions_path}/factory_tick/${element.name}/${frame}/${bone}`, [functions[`${frame}`][bone]['commands']]);
-        toWrite.push(`execute positioned ^${functions[`${frame}`][bone]['pos']['x']} ^${functions[`${frame}`][bone]['pos']['y']} ^${functions[`${frame}`][bone]['pos']['z']} rotated ~${functions[`${frame}`][bone]['rot']['x']} ~${functions[`${frame}`][bone]['rot']['y']} run function ${datapackSettings.project_ID}:${datapackSettings.functions_path}/factory_tick/${element.name}/${frame}/${bone}`)
+        toWrite.push(`execute positioned ^${functions[`${frame}`][bone]['pos']['x']} ^${functions[`${frame}`][bone]['pos']['y']} ^${functions[`${frame}`][bone]['pos']['z']} run function ${datapackSettings.project_ID}:${datapackSettings.functions_path}/factory_tick/${element.name}/${frame}/${bone}`)
       }
       create_function(datapackSettings, `${datapackSettings.functions_path}/factory_tick/${element.name}/${frame}`, toWrite);
     }

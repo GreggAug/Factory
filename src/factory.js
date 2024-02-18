@@ -14,6 +14,7 @@ function create_directory(start, directory) {
   } while (checkedPath != `/${directory}`);
 }
 
+
 function defineFactoryPlugin() {
   var factoryData = {};
   let datapackDialog;
@@ -27,6 +28,7 @@ function defineFactoryPlugin() {
     [
       "actionResourcepackDialog",
       "actionDatapackDialog",
+      "actionTiedFunctionsDialog",
       "actionExportFactoryProject",
     ],
     { condition: () => Format.id == "factory_project" }
@@ -250,6 +252,166 @@ datapackDialog = new Dialog("datapackDialog", {
 datapackDialog.show();
 datapackDialog.hide();
 
+      class myDialog extends Dialog{  // My own version of Dialog class since the original doesn't run onOpen until after the dialog box is shown, also rebuild every time it is shown
+    constructor(id, options) {
+      super(id, options)
+      this.previousAnimation = -1;
+      this.previousBone = -1;
+      this.updating = false;
+  }
+
+	show() {
+
+		// Hide previous
+		if (window.open_interface && open_interface instanceof Dialog == false && typeof open_interface.hide == 'function') {
+			open_interface.hide();
+		}
+
+		if (typeof this.onOpen == 'function') {
+			this.onOpen();
+		}
+
+    if(!this.object){
+      this.build();
+    }
+    else{
+      let oldValues = this.getFormResult()
+      this.build();
+      this.setFormValues(oldValues)
+
+    }
+		
+
+		let jq_dialog = $(this.object);
+
+		document.getElementById('dialog_wrapper').append(this.object);
+		
+		if (this instanceof ShapelessDialog === false) {
+			this.object.style.display = 'flex';
+			this.object.style.top = limitNumber(window.innerHeight/2-this.object.clientHeight/2, 0, 100)+'px';
+			if (this.width) {
+				this.object.style.width = this.width+'px';
+			}
+			if (this.draggable !== false) {
+				let x = Math.clamp((window.innerWidth-this.object.clientWidth)/2, 0, 2000)
+				this.object.style.left = x+'px';
+			}
+		}
+
+		if (!Blockbench.isTouch) {
+			let first_focus = jq_dialog.find('.focusable_input').first();
+			if (first_focus) first_focus.trigger('focus');
+		}
+		this.focus();
+
+		return this;
+	}
+}
+
+if (typeof tiedFunctionsDialog == 'undefined'){
+  tiedFunctionsDialog = new myDialog("tiedFunctionsDialog", {
+    title: "Tied Functions Menu",
+    form: {
+      animation: {
+        type: "select",
+        label: "Animation",
+        options: {},
+        description:
+          "Select which animation to edit tied functions for.",
+      },
+      bone: {
+        type: "select",
+        label: "Bone",
+        options: {},
+        description:
+          "Select which animation to edit tied functions for.",
+      },
+      balls: {
+        type: "string",
+        label: "cock",
+        value: "",
+        description:
+          "Select which animation to edit tied functions for.",
+      }
+    },
+    onConfirm: function () {
+    },
+    onOpen: function(){
+      let animationNames = {}
+      Project.animations.forEach((animation, i) => animationNames[i] = `${animation.name}`)
+      tiedFunctionsDialog.form.animation.options = animationNames
+
+      let boneNames = {
+        0: 'Entity Position'
+      }
+      Project.groups.forEach((bone, i) => boneNames[i + 1] = `${bone.name}`)
+      tiedFunctionsDialog.form.bone.options = boneNames
+
+
+      
+      if( typeof factoryData[`${Project.uuid}`]["tiedFunctions"] != 'undefined'){
+        console.log("test")
+        if( typeof factoryData[`${Project.uuid}`]["tiedFunctions"][this.getFormResult().animation] != 'undefined'){
+          console.log("test")
+          if( typeof factoryData[`${Project.uuid}`]["tiedFunctions"][this.getFormResult().animation][this.getFormResult().bone] != 'undefined'){
+            console.log("test")
+            tiedFunctionsDialog.form.balls.value = factoryData[`${Project.uuid}`]["tiedFunctions"][this.getFormResult().animation][this.getFormResult().bone]
+            return
+          }
+        }
+      }
+      tiedFunctionsDialog.form.balls.value = ""
+    },
+    onFormChange: function(){
+      if(!this.updating){ // So the method can't recursively call itself
+        this.updating = true;
+        if(this.previousAnimation == this.getFormResult().animation && this.previousBone == this.getFormResult().bone){
+          console.log("unchanged")
+          if (factoryData[`${Project.uuid}`]["tiedFunctions"] == undefined){
+            factoryData[`${Project.uuid}`]["tiedFunctions"] = {}
+          }
+          if (factoryData[`${Project.uuid}`]["tiedFunctions"][this.previousAnimation] == undefined){
+            factoryData[`${Project.uuid}`]["tiedFunctions"][this.previousAnimation] = {}
+          }
+          if (factoryData[`${Project.uuid}`]["tiedFunctions"][this.previousAnimation][this.previousBone] == undefined){
+            factoryData[`${Project.uuid}`]["tiedFunctions"][this.previousAnimation][this.previousBone] = {};
+          }
+          factoryData[`${Project.uuid}`]["tiedFunctions"][this.previousAnimation][this.previousBone] = tiedFunctionsDialog.getFormResult().balls;
+          console.log(factoryData[`${Project.uuid}`]["tiedFunctions"])
+        }
+
+        else {
+          console.log("changed")
+          this.previousAnimation = this.getFormResult().animation;
+          this.previousBone = this.getFormResult().bone;
+          let set = false
+          if( typeof factoryData[`${Project.uuid}`]["tiedFunctions"] != 'undefined'){
+            if( typeof factoryData[`${Project.uuid}`]["tiedFunctions"][this.previousAnimation] != 'undefined'){
+              if( typeof factoryData[`${Project.uuid}`]["tiedFunctions"][this.previousAnimation][this.previousBone] != 'undefined'){
+                set = true
+                this.setFormValues({
+                  animation: this.previousAnimation,
+                  bone: this.previousBone,
+                  balls: factoryData[`${Project.uuid}`]["tiedFunctions"][this.previousAnimation][this.previousBone]
+                })
+              }
+            }
+          }
+          if(!set){
+            this.setFormValues({
+              animation: this.previousAnimation,
+              bone: this.previousBone,
+              balls: ""
+            })
+          }
+        }
+        this.show()
+        this.updating = false;
+      }
+    }
+  });
+}
+
       
 
       // Saves Entity Settings and Project Settings
@@ -336,6 +498,21 @@ datapackDialog.hide();
                 );
               }
             datapackDialog.show();
+          },
+        }));
+        (actionTiedFunctionsDialog = new Action("actionTiedFunctionsDialog", {
+          condition: () => Format.id == "factory_project",
+          name: "Tied Functions",
+          description: "Set Tied Functions",
+          icon: "settings",
+          click: function () {
+            if (factoryData[`${Project.uuid}`] != undefined)
+              if (factoryData[`${Project.uuid}`]["tiedFunctions"] != undefined) {
+                tiedFunctionsDialog.setFormValues(
+                  factoryData[`${Project.uuid}`]["tiedFunctions"]
+                );
+              }
+              tiedFunctionsDialog.show();
           },
         }));
 
@@ -446,132 +623,8 @@ function exportFactoryProject(resourcepackSettings, datapackSettings) {
   };
 
   Project.animations.forEach(ExportAnimation);
-  function ExportAnimation(animation, index) {
-    if (datapackSettings.summon_animation == animation.name)
-      summonAnimation = animation.name;
-    removeAnimationTags.push(
-      `tag @s remove ${datapackSettings.primary_tag}.animating.${animation.name}`
-    );
-    let OBJdirs = [];
-    animation.select();
-    for (let x = 0.0; x <= animation.length; x += 0.1) {
-      Timeline.time = x;
-      let tempOBJDirectory = `${
-        resourcepackSettings.output
-      }\\objstemp\\${y.toString(36)}`; // Exports frames as individual OBJ files, naming scheme is in base-36
-      Animator.preview();
-      OBJdirs.push(tempOBJDirectory);
-      fs.writeFileSync(
-        tempOBJDirectory,
-        Codecs.obj.compile(),
-        function (err, result) {
-          if (err) console.log("", err);
-        }
-      );
-      y += 1;
-    }
-    let args = [`${resourcepackSettings.current_objmc_path}`, `--objs`].concat(
-      OBJdirs.concat([
-        `--texs`,
-        `${Project.textures[0].path}`,
-        `--autoplay`,
-        `--duration`,
-        `${parseInt(animation.length * 20) + 2}`,
-        `--colorbehavior`,
-        `yaw`,
-        `time`,
-        `time`,
-        `--out`,
-        `${resourcepackSettings.output}\\assets\\${resourcepackSettings.project_ID}\\models\\entity\\${entityName}\\${animation.name}.json`,
-        `${resourcepackSettings.output}\\assets\\${resourcepackSettings.project_ID}\\textures\\entity\\${entityName}\\${animation.name}.png`,
-      ])
-    );
-    exec.execFileSync(`py`, args, { maxBuffer: Infinity });
-    if (resourcepackSettings.use_hurt_tint) {
-      args = [`${resourcepackSettings.current_objmc_path}`, `--objs`].concat(
-        OBJdirs.concat([
-          `--texs`,
-          `${Project.textures[1].path}`,
-          `--autoplay`,
-          `--duration`,
-          `${parseInt(animation.length * 20) + 2}`,
-          `--colorbehavior`,
-          `yaw`,
-          `time`,
-          `time`,
-          `--out`,
-          `${resourcepackSettings.output}\\deleteme.factory_asset`,
-          `${resourcepackSettings.output}\\assets\\${resourcepackSettings.project_ID}\\textures\\entity\\${entityName}\\${animation.name}.hurt.png`,
-        ])
-      );
-      exec.execFileSync(`py`, args, { maxBuffer: Infinity });
-      let hurtModelJson = {
-        parent: `${resourcepackSettings.project_ID}:entity/${entityName}/${animation.name}`,
-        textures: {
-          0: `${resourcepackSettings.project_ID}:entity/${entityName}/${animation.name}.hurt`,
-        },
-      };
-      fs.writeFileSync(
-        `${resourcepackSettings.output}\\assets\\${resourcepackSettings.project_ID}\\models\\entity\\${entityName}\\${animation.name}.hurt.json`,
-        compileJSON(hurtModelJson),
-        function (err, result) {
-          if (err) console.log("", err);
-        }
-      );
-    }
-
-    let modelJson = fs.readFileSync(
-      `${resourcepackSettings.output}\\assets\\${resourcepackSettings.project_ID}\\models\\entity\\${entityName}\\${animation.name}.json`,
-      "utf8"
-    );
-    let parsedModelJson = autoParseJSON(modelJson);
-    parsedModelJson.textures = {
-      0: `${resourcepackSettings.project_ID}:entity/${entityName}/${animation.name}`,
-    };
-    parsedModelJson.display.ground = {
-      rotation: [85, 0, 0],
-      translation: [0, -16.91, -1],
-      scale: [1, 1, 1],
-    };
-    parsedModelJson.display.head = {
-      rotation: [85, 0, 0],
-      translation: [0, 0, 0],
-      scale: [1, 1, 1],
-    };
-    modelJson = compileJSON(parsedModelJson);
-    fs.writeFileSync(
-      `${resourcepackSettings.output}\\assets\\${resourcepackSettings.project_ID}\\models\\entity\\${entityName}\\${animation.name}.json`,
-      modelJson,
-      function (err, result) {
-        if (err) console.log("", err);
-      }
-    );
-    let override = {
-      model: `${resourcepackSettings.project_ID}:entity/${entityName}/${animation.name}`,
-      predicate: {
-        custom_model_data:
-          resourcepackSettings.custom_model_data_start + animCount,
-      },
-    };
-    overrides.push(override);
-    animDict[animation.name] = {
-      CMD: resourcepackSettings.custom_model_data_start + animCount,
-    };
-    animCount += 1;
-    if (resourcepackSettings.use_hurt_tint) {
-      let override = {
-        model: `${resourcepackSettings.project_ID}:entity/${entityName}/${animation.name}.hurt`,
-        predicate: {
-          custom_model_data:
-            resourcepackSettings.custom_model_data_start + animCount,
-        },
-      };
-      overrides.push(override);
-      animDict[animation.name]["CMDhurt"] =
-        resourcepackSettings.custom_model_data_start + animCount; // Will probably be an unused value but eh
-      animCount += 1;
-    }
-  }
+  //$exportAnimation
+  
   fs.rmdirSync(`${resourcepackSettings.output}\\objstemp`, { recursive: true }); // Deletes the temporary OBJs folder
   let itemJsonFile = fs.readFileSync(
     `${resourcepackSettings.output}\\assets\\minecraft\\models\\item\\${resourcepackSettings.item_json}.json`,
@@ -990,9 +1043,9 @@ function generateStartAnimationFuncts(animation, index) {
       `execute if entity @s[tag=factory.entity.hurt] run data modify entity @s ${
         datapackSettings.display_slot
       }.tag.CustomModelData set value ${animDict[animation.name]["CMDhurt"]}`,
-      `scoreboard players set #factory.starting_frame factory.dummy 0`,
+      `scoreboard players set #factory.starting_frame factory.dummy -3`, // Starting the animation at -3 frames behind makes it actually start on the first frame, don't know why
       `scoreboard players set #factory.duration factory.dummy ${
-        parseInt(animation.length * 20) - 1
+        parseInt(animation.length * 20)
       }`,
       `function ${datapackSettings.project_ID}:factory/set_frame`,
       `execute store result entity @s ${datapackSettings.display_slot}.tag.display.color int 1 run scoreboard players get #factory.color_offset factory.dummy`,
@@ -1069,7 +1122,7 @@ if (Project.animations.length != 0) {
       let toWrite = []
       for(bone in functions[`${frame}`]){
         create_function(datapackSettings, `${datapackSettings.functions_path}/factory_tick/${element.name}/${frame}/${bone}`, [functions[`${frame}`][bone]['commands']]);
-        toWrite.push(`execute positioned ^${functions[`${frame}`][bone]['pos']['x']} ^${functions[`${frame}`][bone]['pos']['y']} ^${functions[`${frame}`][bone]['pos']['z']} rotated ~${functions[`${frame}`][bone]['rot']['x']} ~${functions[`${frame}`][bone]['rot']['y']} run function ${datapackSettings.project_ID}:${datapackSettings.functions_path}/factory_tick/${element.name}/${frame}/${bone}`)
+        toWrite.push(`execute positioned ^${functions[`${frame}`][bone]['pos']['x']} ^${functions[`${frame}`][bone]['pos']['y']} ^${functions[`${frame}`][bone]['pos']['z']} run function ${datapackSettings.project_ID}:${datapackSettings.functions_path}/factory_tick/${element.name}/${frame}/${bone}`)
       }
       create_function(datapackSettings, `${datapackSettings.functions_path}/factory_tick/${element.name}/${frame}`, toWrite);
     }
@@ -1146,11 +1199,13 @@ if (summonAnimation != null) {
 }
 
 
+      // Commenting out the keyframes for adding functions
+      /*
       BoneAnimator.addChannel("factory.commands", {
         condition: () => Format.id == "factory_project",
         name: "Functions",
         mutable: false,
-        max_data_points: 1000,
+        max_data_points: 1000
       });
 
       new Property(KeyframeDataPoint, "string", "factory.commands", {
@@ -1159,7 +1214,30 @@ if (summonAnimation != null) {
           return point.keyframe.channel === "factory.commands";
         },
         exposed: true,
+        default: '',
+        factoryCommand: true
       });
+
+      
+      new BarSelect('function_interpolation', {
+        category: 'animation',
+        condition: () => Animator.open && Timeline.selected.length && Timeline.selected[0]["channel"] == 'factory.commands',
+        options: {
+          step: true,
+          span: true
+        },
+        onChange: function(sel, event) {
+          Undo.initEdit({keyframes: Timeline.selected})
+          Timeline.selected.forEach((kf) => {
+            if (kf.transform) {
+              kf.interpolation = sel.value;
+            }
+          })
+          Undo.finishEdit('Change keyframes interpolation')
+          updateKeyframeSelection();
+        }
+      })
+      */
 
       actionExportFactoryProject = new Action("actionExportFactoryProject", {
         condition: () => Format.id == "factory_project",
@@ -1189,4 +1267,3 @@ if (summonAnimation != null) {
 }
 
 defineFactoryPlugin();
-
